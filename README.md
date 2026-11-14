@@ -120,21 +120,6 @@ PaymentWebhookGateway/
 
 ---
 
-## Engineering Documentation Suite
-
-Detailed architectural specifications, security analyses, and roadmaps are organized under [`docs/`](./docs/):
-
-| Document | Focus & Highlights |
-| :--- | :--- |
-| [**01. PRD (Product Requirements)**](./docs/01-PRD.md) | Business problems, target personas, functional requirements (FR-01 to FR-05), latency/consistency NFRs, and acceptance criteria. |
-| [**02. Architecture & Design**](./docs/02-ARCHITECTURE-AND-DESIGN.md) | High-level system topology, Mermaid sequence diagrams (Idempotency Hit/Miss, Webhook Polly flow), code structure, and API contracts. |
-| [**03. Scope & Limitations**](./docs/03-SCOPE-AND-LIMITATIONS.md) | Explicit In-Scope vs. Out-of-Scope matrix, Memory vs. Redis trade-offs, synchronous vs. message broker boundaries, and cache TTL lifecycle. |
-| [**04. Security & Threat Model**](./docs/04-SECURITY.md) | Cryptographic HMAC-SHA256 verification, `FixedTimeEquals` timing defense, anti-replay mechanisms, secret isolation, and STRIDE analysis. |
-| [**05. Initial Build Roadmap**](./docs/05-DEVELOPMENT-ROADMAP.md) | Phased implementation plan (Phases 1-4: Filters, Services, xUnit/HTTP tests, Observability) and Definition of Done (DoD) checklist. |
-| [**06. Future Scaling Roadmap**](./docs/06-FUTURE-UPDATES-ROADMAP.md) | Strategic evolution toward v2.0: PostgreSQL audit trails, Dead-Letter Queues, MassTransit/Kafka streaming, OpenTelemetry, and multi-provider adapters. |
-
----
-
 ## Running Automated Tests
 
 ```bash
