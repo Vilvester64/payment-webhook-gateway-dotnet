@@ -1,0 +1,85 @@
+@PaymentGateway.Api_HostAddress = https://localhost:7001
+
+### 1. Health Check
+GET {{PaymentGateway.Api_HostAddress}}/health
+Accept: application/json
+
+###
+
+### 2. Create Payment - Missing Idempotency Key (Expect 400 Bad Request)
+POST {{PaymentGateway.Api_HostAddress}}/api/v1/payments
+Content-Type: application/json
+
+{
+  "orderId": "ORD-2026-001",
+  "amount": 150000.00,
+  "currency": "IDR",
+  "customerEmail": "customer@example.com",
+  "paymentMethod": "credit_card"
+}
+
+###
+
+### 3. Create Payment - Initial Request (Expect 200 OK)
+POST {{PaymentGateway.Api_HostAddress}}/api/v1/payments
+Content-Type: application/json
+X-Idempotency-Key: test-key-ord-2026-001
+
+{
+  "orderId": "ORD-2026-001",
+  "amount": 150000.00,
+  "currency": "IDR",
+  "customerEmail": "customer@example.com",
+  "paymentMethod": "credit_card"
+}
+
+###
+
+### 4. Create Payment - Replayed Request (Expect 200 OK with X-Idempotent-Replayed: true)
+POST {{PaymentGateway.Api_HostAddress}}/api/v1/payments
+Content-Type: application/json
+X-Idempotency-Key: test-key-ord-2026-001
+
+{
+  "orderId": "ORD-2026-001",
+  "amount": 150000.00,
+  "currency": "IDR",
+  "customerEmail": "customer@example.com",
+  "paymentMethod": "credit_card"
+}
+
+###
+
+### 5. Ingest Webhook - Missing Signature (Expect 401 Unauthorized)
+POST {{PaymentGateway.Api_HostAddress}}/api/v1/webhooks/midtrans
+Content-Type: application/json
+
+{
+  "eventId": "evt_123456",
+  "eventType": "payment.success",
+  "transactionId": "txn_abc123",
+  "orderId": "ORD-2026-001",
+  "status": "settlement",
+  "grossAmount": 150000.00,
+  "timestamp": "2026-11-14T12:00:00Z"
+}
+
+###
+
+### 6. Ingest Webhook - Invalid Signature (Expect 401 Unauthorized)
+POST {{PaymentGateway.Api_HostAddress}}/api/v1/webhooks/midtrans
+Content-Type: application/json
+X-Webhook-Signature: sha256=0000000000000000000000000000000000000000000000000000000000000000
+
+{
+  "eventId": "evt_123456",
+  "eventType": "payment.success",
+  "transactionId": "txn_abc123",
+  "orderId": "ORD-2026-001",
+  "status": "settlement",
+  "grossAmount": 150000.00,
+  "timestamp": "2026-11-14T12:00:00Z"
+}
+
+###
+
