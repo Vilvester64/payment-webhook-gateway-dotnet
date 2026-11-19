@@ -26,9 +26,3 @@ public record WebhookPayload(
     decimal GrossAmount,
     DateTimeOffset Timestamp
 );
-
-public record ApiErrorResponse(
-    string Code,
-    string Message,
-    string TraceId
-);

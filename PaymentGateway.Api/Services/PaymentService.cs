@@ -1,3 +1,4 @@
+using PaymentGateway.Api.Logging;
 using PaymentGateway.Api.Models;
 
 namespace PaymentGateway.Api.Services;
@@ -36,7 +37,8 @@ public class PaymentService : IPaymentService
         {
             _logger.LogInformation(
                 "Payment intent created: {TransactionId} for Order {OrderId}. Amount: {Amount} {Currency}, Customer: {CustomerEmail}",
-                transactionId, request.OrderId, request.Amount, request.Currency.ToUpperInvariant(), request.CustomerEmail);
+                transactionId, request.OrderId, request.Amount, request.Currency.ToUpperInvariant(),
+                LogSanitizer.MaskEmail(request.CustomerEmail));
 
             var response = new PaymentResponse(
                 TransactionId: transactionId,

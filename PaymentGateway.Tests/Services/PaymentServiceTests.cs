@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Services;
@@ -48,5 +49,45 @@ public class PaymentServiceTests
         );
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => _service.CreatePaymentAsync(request));
+    }
+
+    [Fact]
+    public async Task CreatePaymentAsync_MasksCustomerEmailInLogs()
+    {
+        var logger = new CapturingLogger<PaymentService>();
+        var service = new PaymentService(logger);
+
+        var request = new CreatePaymentRequest(
+            OrderId: "ORD-LOG-1",
+            Amount: 1000m,
+            Currency: "IDR",
+            CustomerEmail: "jane.doe@example.com",
+            PaymentMethod: "credit_card"
+        );
+
+        await service.CreatePaymentAsync(request);
+
+        var output = string.Join("\n", logger.Messages);
+        Assert.DoesNotContain("jane.doe@example.com", output);
+        Assert.Contains("j***@example.com", output);
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<string> Messages { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+        }
     }
 }

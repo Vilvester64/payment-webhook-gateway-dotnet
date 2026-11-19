@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
 using PaymentGateway.Api.Configuration;
+using Polly.Timeout;
 using PaymentGateway.Api.Models;
 
 namespace PaymentGateway.Api.Services;
@@ -66,6 +67,19 @@ public class DownstreamNotificationService : IDownstreamNotificationService
                 (int)response.StatusCode,
                 content,
                 $"Downstream order service responded with HTTP {(int)response.StatusCode}");
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Downstream notification timed out for Event {EventId}",
+                payload.EventId);
+
+            return new DownstreamNotificationResult(
+                false,
+                StatusCodes.Status504GatewayTimeout,
+                null,
+                "The downstream service did not respond within the configured timeout.");
         }
         catch (Exception ex)
         {

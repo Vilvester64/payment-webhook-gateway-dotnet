@@ -1,6 +1,7 @@
-@PaymentGateway.Api_HostAddress = https://localhost:7001
+@PaymentGateway.Api_HostAddress = http://localhost:5076
+@apiKey = dev_api_key_2026_payment_gateway
 
-### 1. Health Check
+### 1. Health Check (dependency-aware)
 GET {{PaymentGateway.Api_HostAddress}}/health
 Accept: application/json
 
@@ -9,6 +10,7 @@ Accept: application/json
 ### 2. Create Payment - Missing Idempotency Key (Expect 400 Bad Request)
 POST {{PaymentGateway.Api_HostAddress}}/api/v1/payments
 Content-Type: application/json
+X-Api-Key: {{apiKey}}
 
 {
   "orderId": "ORD-2026-001",
@@ -20,9 +22,10 @@ Content-Type: application/json
 
 ###
 
-### 3. Create Payment - Initial Request (Expect 200 OK)
+### 3. Create Payment - Initial Request (Expect 201 Created)
 POST {{PaymentGateway.Api_HostAddress}}/api/v1/payments
 Content-Type: application/json
+X-Api-Key: {{apiKey}}
 X-Idempotency-Key: test-key-ord-2026-001
 
 {
@@ -35,9 +38,10 @@ X-Idempotency-Key: test-key-ord-2026-001
 
 ###
 
-### 4. Create Payment - Replayed Request (Expect 200 OK with X-Idempotent-Replayed: true)
+### 4. Create Payment - Replayed Request (Expect 201 Created + X-Idempotent-Replayed: true)
 POST {{PaymentGateway.Api_HostAddress}}/api/v1/payments
 Content-Type: application/json
+X-Api-Key: {{apiKey}}
 X-Idempotency-Key: test-key-ord-2026-001
 
 {
@@ -51,7 +55,7 @@ X-Idempotency-Key: test-key-ord-2026-001
 ###
 
 ### 5. Ingest Webhook - Missing Signature (Expect 401 Unauthorized)
-POST {{PaymentGateway.Api_HostAddress}}/api/v1/webhooks/midtrans
+POST {{PaymentGateway.Api_HostAddress}}/api/v1/webhooks/payment-callback
 Content-Type: application/json
 
 {
@@ -67,7 +71,7 @@ Content-Type: application/json
 ###
 
 ### 6. Ingest Webhook - Invalid Signature (Expect 401 Unauthorized)
-POST {{PaymentGateway.Api_HostAddress}}/api/v1/webhooks/midtrans
+POST {{PaymentGateway.Api_HostAddress}}/api/v1/webhooks/payment-callback
 Content-Type: application/json
 X-Webhook-Signature: sha256=0000000000000000000000000000000000000000000000000000000000000000
 
@@ -82,4 +86,3 @@ X-Webhook-Signature: sha256=0000000000000000000000000000000000000000000000000000
 }
 
 ###
-

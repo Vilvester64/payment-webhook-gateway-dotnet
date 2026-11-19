@@ -24,9 +24,9 @@ The **Payment & Webhook Gateway Service** resolves these failure modes by acting
 ## Key Engineering Highlights
 
 ### 1. Distributed Idempotency (`X-Idempotency-Key`)
-* Guarantees exact-once processing semantics for state-mutating requests (`POST /api/v1/payments`).
-* Prevents race conditions using an atomic in-flight reservation marker (`IN_PROGRESS`). Concurrent duplicate calls immediately receive `409 Conflict`.
-* Successful responses are cached and replayed for subsequent requests with header `X-Idempotent-Replayed: true` without hitting downstream processors.
+* Guarantees exact-once processing semantics for state-mutating requests (`POST /api/v1/payments`) and webhook event deduplication.
+* Prevents race conditions using an atomic in-flight reservation (`SET NX` on Redis, atomic dictionary on in-memory mode). Concurrent duplicate calls immediately receive `409 Conflict`.
+* Successful responses are cached and replayed byte-for-byte — status code, body and `Location` header — with header `X-Idempotent-Replayed: true` and without hitting downstream processors.
 
 ### 2. Timing-Safe HMAC-SHA256 Webhook Verification
 * Buffers the incoming raw request stream before model binding to preserve byte-exact integrity.
@@ -39,8 +39,12 @@ The **Payment & Webhook Gateway Service** resolves these failure modes by acting
 * **Circuit Breaker**: Breaks connection on 50% failure rate across a 30-second window, protecting downstream services from cascading collapse.
 * **Timeout & Isolation**: 5-second per-request timeout with an overall 15-second pipeline timeout.
 
-### 4. Zero-Dependency Developer Experience
-* Runs instantly on local developer machines without external dependencies using `AddDistributedMemoryCache`.
+### 4. API Key Authentication & Rate Limiting
+* `POST /api/v1/payments` requires an `X-Api-Key` header, verified with a constant-time SHA-256 digest comparison (fails closed when no key is configured).
+* Payment creation is rate limited per API key (falling back to client IP) with a fixed window; rejected requests receive RFC 7807 `429 Too Many Requests`.
+
+### 5. Zero-Dependency Developer Experience
+* Runs instantly on local developer machines without external dependencies using the in-process atomic idempotency store.
 * Production-ready switch to Redis via a single configuration flag (`"UseRedis": true`).
 
 
@@ -66,7 +70,9 @@ dotnet build
 # Run the API
 dotnet run --project PaymentGateway.Api
 ```
-The service starts at `https://localhost:7001` (or `http://localhost:5000`).
+The service starts at `http://localhost:5076` (or `https://localhost:7192` with the `https` launch profile).
+
+> Local development uses test-only credentials from `appsettings.Development.json`: webhook secret `whsec_test_secret_key_2026` and API key `dev_api_key_2026_payment_gateway` (send it as `X-Api-Key`). `appsettings.json` keeps both secrets empty on purpose; production must supply `GatewaySettings__WebhookSecretKey` and `GatewaySettings__ApiKey` through a secret manager or environment variables.
 
 ### Option B: Redis Distributed Cache Mode
 To test with production-equivalent distributed caching:
@@ -105,16 +111,17 @@ PaymentWebhookGateway/
 │   ├── 05-DEVELOPMENT-ROADMAP.md          # Implementation phases & Definition of Done
 │   └── 06-FUTURE-UPDATES-ROADMAP.md       # Post-MVP scale (MassTransit, Kafka, PostgreSQL)
 ├── PaymentGateway.Api/                    # .NET 10 Minimal APIs Gateway Service
-│   ├── Configuration/                     # Options pattern & strongly-typed settings
-│   ├── Endpoints/                         # Minimal API route definitions
+│   ├── Configuration/                     # GatewaySettings & ResilienceSettings (Options pattern)
+│   ├── Endpoints/                         # Minimal API route definitions & request validation
 │   ├── Filters/                           # IdempotencyFilter & WebhookSignatureFilter
-│   ├── Middleware/                        # Correlation ID & Exception handling
-│   ├── Models/                            # DTOs, Envelopes & Request/Response schemas
-│   ├── Services/                          # IdempotencyService & DownstreamForwarder (Polly)
-│   ├── Program.cs                         # Application bootstrap & DI container
-│   ├── appsettings.json                   # Configuration defaults
+│   ├── Health/                            # Idempotency store health check
+│   ├── Middleware/                        # Correlation ID middleware
+│   ├── Models/                            # DTOs & Request/Response schemas
+│   ├── Services/                          # Atomic idempotency stores & Polly-protected downstream client
+│   ├── Program.cs                         # Application bootstrap, DI, resilience & problem details
+│   ├── appsettings.json                   # Configuration defaults (no secrets)
 │   └── PaymentGateway.Api.http            # Runnable HTTP integration test scenarios
-├── PaymentGateway.Tests/                  # Automated Testing Suite (xUnit)
+├── PaymentGateway.Tests/                  # Unit tests + WebApplicationFactory integration tests (xUnit)
 └── README.md                              # Project overview & quick-start guide
 ```
 

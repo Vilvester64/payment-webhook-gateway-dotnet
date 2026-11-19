@@ -2,6 +2,7 @@
 @port = 5076
 @host = http://{{hostname}}:{{port}}
 @api = {{host}}/api/v1
+@apiKey = dev_api_key_2026_payment_gateway
 
 ###
 ### 1. Health Probe Checks
@@ -23,6 +24,7 @@ Accept: application/json
 # 2.1 First Payment Request (Cache Miss -> Expect HTTP 201 Created)
 POST {{api}}/payments
 Content-Type: application/json
+X-Api-Key: {{apiKey}}
 X-Idempotency-Key: idemp-req-order-2026-9812-v1
 
 {
@@ -34,9 +36,10 @@ X-Idempotency-Key: idemp-req-order-2026-9812-v1
 }
 
 ###
-# 2.2 Replayed Payment Request with SAME Idempotency Key (Cache Hit -> Expect HTTP 200 OK + X-Idempotent-Replayed: true)
+# 2.2 Replayed Payment Request with SAME Idempotency Key (Cache Hit -> Expect HTTP 201 Created + X-Idempotent-Replayed: true)
 POST {{api}}/payments
 Content-Type: application/json
+X-Api-Key: {{apiKey}}
 X-Idempotency-Key: idemp-req-order-2026-9812-v1
 
 {
@@ -51,6 +54,22 @@ X-Idempotency-Key: idemp-req-order-2026-9812-v1
 # 2.3 Payment Request Missing X-Idempotency-Key (Expect HTTP 400 Bad Request)
 POST {{api}}/payments
 Content-Type: application/json
+X-Api-Key: {{apiKey}}
+
+{
+  "orderId": "ORD-2026-9812",
+  "amount": 150000.00,
+  "currency": "IDR",
+  "customerEmail": "user@example.com",
+  "paymentMethod": "credit_card"
+}
+
+
+###
+# 2.4 Payment Request Missing X-Api-Key (Expect HTTP 401 Unauthorized)
+POST {{api}}/payments
+Content-Type: application/json
+X-Idempotency-Key: idemp-unauth-2026-001
 
 {
   "orderId": "ORD-2026-9812",
@@ -80,31 +99,33 @@ Content-Type: application/json
 #
 
 # 3.1 Valid Signed Webhook (Expect HTTP 200 OK & Resilient Forwarding to Downstream)
+# X-Webhook-Timestamp is optional; when sent, it must be within 300 seconds of server time.
 POST {{api}}/webhooks/payment-callback
 Content-Type: application/json
 X-Webhook-Signature: sha256=f80fddf9b3a14f5069f7596e3604604f8395f3c10440c76bf7b6949caff87b62
 
 {"eventId":"evt_live_2026_001","eventType":"payment.settled","transactionId":"TXN-9812470123","orderId":"ORD-2026-9812","status":"SETTLED","grossAmount":150000.00,"timestamp":"2026-11-14T12:00:00+00:00"}
-
 ###
+
 # 3.2 Duplicate Webhook (Same EventId -> Expect HTTP 200 OK + X-Idempotent-Replayed: true, Downstream Call Skipped)
 POST {{api}}/webhooks/payment-callback
 Content-Type: application/json
 X-Webhook-Signature: sha256=f80fddf9b3a14f5069f7596e3604604f8395f3c10440c76bf7b6949caff87b62
 
 {"eventId":"evt_live_2026_001","eventType":"payment.settled","transactionId":"TXN-9812470123","orderId":"ORD-2026-9812","status":"SETTLED","grossAmount":150000.00,"timestamp":"2026-11-14T12:00:00+00:00"}
-
 ###
+
 # 3.3 Webhook with Invalid / Tampered Signature (Expect HTTP 401 Unauthorized)
 POST {{api}}/webhooks/payment-callback
 Content-Type: application/json
 X-Webhook-Signature: sha256=0000000000000000000000000000000000000000000000000000000000000000
 
 {"eventId":"evt_live_2026_001","eventType":"payment.settled","transactionId":"TXN-9812470123","orderId":"ORD-2026-9812","status":"SETTLED","grossAmount":150000.00,"timestamp":"2026-11-14T12:00:00+00:00"}
-
 ###
+
 # 3.4 Webhook Missing Signature Header (Expect HTTP 401 Unauthorized)
 POST {{api}}/webhooks/payment-callback
 Content-Type: application/json
 
 {"eventId":"evt_live_2026_001","eventType":"payment.settled","transactionId":"TXN-9812470123","orderId":"ORD-2026-9812","status":"SETTLED","grossAmount":150000.00,"timestamp":"2026-11-14T12:00:00+00:00"}
+###
