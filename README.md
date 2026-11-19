@@ -54,10 +54,10 @@ The **Payment & Webhook Gateway Service** resolves these failure modes by acting
 
 ### Prerequisites
 * [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (or higher)
-* Optional: [Docker](https://www.docker.com/) (only if running Redis locally)
+* Optional: [Memurai](https://www.memurai.com/get-memurai) or any Redis-compatible server (only for Redis cache mode)
 
 ### Option A: Zero-Dependency Local Mode (Default)
-By default, the service initializes using an in-memory distributed cache (`AddDistributedMemoryCache`), requiring no external Docker containers or background services.
+By default, the service uses an in-memory idempotency store, requiring no external services or background processes.
 
 ```bash
 # Clone the repository
@@ -77,24 +77,20 @@ The service starts at `http://localhost:5076` (or `https://localhost:7192` with 
 ### Option B: Redis Distributed Cache Mode
 To test with production-equivalent distributed caching:
 
-1. Start a local Redis instance via Docker:
-   ```bash
-   docker run -d --name payment-redis -p 6379:6379 redis:alpine
+1. Install a Redis-compatible server. On Windows, [Memurai Developer](https://www.memurai.com/get-memurai) runs as an auto-start service on `localhost:6379`:
+   ```powershell
+   winget install -e --id Memurai.MemuraiDeveloper
    ```
 
-2. Enable Redis in `PaymentGateway.Api/appsettings.Development.json`:
-   ```json
-   {
-     "GatewayOptions": {
-       "UseRedis": true,
-       "RedisConnectionString": "localhost:6379"
-     }
-   }
+2. Launch the API with the Redis profile (sets `GatewaySettings__UseRedis=true`):
+   ```bash
+   dotnet run --project PaymentGateway.Api --launch-profile http-redis
    ```
 
-3. Launch the API:
+3. Verify the active cache mode:
    ```bash
-   dotnet run --project PaymentGateway.Api
+   curl http://localhost:5076/api/v1/health
+   # {"status":"Healthy","cacheMode":"Redis", ...}
    ```
 
 ---

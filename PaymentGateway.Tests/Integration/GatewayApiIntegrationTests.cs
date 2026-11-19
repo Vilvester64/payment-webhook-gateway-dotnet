@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -154,6 +155,50 @@ public class GatewayApiIntegrationTests : IClassFixture<WebApplicationFactory<Pr
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Contains("IDEMPOTENCY_KEY_REUSED", body);
+    }
+
+    [Fact]
+    public async Task GetPayment_AfterCreate_ReturnsStoredPayment()
+    {
+        using var create = PaymentRequest(PaymentBody("ORD-INT-GET"), $"int-get-{Guid.NewGuid():N}");
+        var createResponse = await _client.SendAsync(create);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+
+        using var created = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+        var transactionId = created.RootElement.GetProperty("transactionId").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(transactionId));
+
+        using var get = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/payments/{transactionId}");
+        get.Headers.Add(ApiKeyHeader, ApiKey);
+        var response = await _client.SendAsync(get);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(transactionId!, body);
+        Assert.Contains("ORD-INT-GET", body);
+        Assert.Contains("PENDING", body);
+    }
+
+    [Fact]
+    public async Task GetPayment_UnknownTransactionId_Returns404()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/payments/TXN-{Guid.NewGuid():N}");
+        request.Headers.Add(ApiKeyHeader, ApiKey);
+        var response = await _client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Contains("PAYMENT_NOT_FOUND", body);
+    }
+
+    [Fact]
+    public async Task GetPayment_WithoutApiKey_Returns401()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/payments/TXN-{Guid.NewGuid():N}");
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using PaymentGateway.Api.Configuration;
 using PaymentGateway.Api.Models;
 using PaymentGateway.Api.Services;
 
@@ -11,7 +13,9 @@ public class PaymentServiceTests
 
     public PaymentServiceTests()
     {
-        _service = new PaymentService(NullLogger<PaymentService>.Instance);
+        _service = new PaymentService(
+            NullLogger<PaymentService>.Instance,
+            new InMemoryPaymentStore(Options.Create(new GatewaySettings())));
     }
 
     [Fact]
@@ -55,7 +59,9 @@ public class PaymentServiceTests
     public async Task CreatePaymentAsync_MasksCustomerEmailInLogs()
     {
         var logger = new CapturingLogger<PaymentService>();
-        var service = new PaymentService(logger);
+        var service = new PaymentService(
+            logger,
+            new InMemoryPaymentStore(Options.Create(new GatewaySettings())));
 
         var request = new CreatePaymentRequest(
             OrderId: "ORD-LOG-1",
@@ -70,6 +76,29 @@ public class PaymentServiceTests
         var output = string.Join("\n", logger.Messages);
         Assert.DoesNotContain("jane.doe@example.com", output);
         Assert.Contains("j***@example.com", output);
+    }
+
+    [Fact]
+    public async Task CreatePaymentAsync_PersistsPaymentForLookup()
+    {
+        var store = new InMemoryPaymentStore(Options.Create(new GatewaySettings()));
+        var service = new PaymentService(NullLogger<PaymentService>.Instance, store);
+
+        var request = new CreatePaymentRequest(
+            OrderId: "ORD-STORE-1",
+            Amount: 5000m,
+            Currency: "IDR",
+            CustomerEmail: "store@example.com",
+            PaymentMethod: "credit_card"
+        );
+
+        var response = await service.CreatePaymentAsync(request);
+        var stored = await store.GetAsync(response.TransactionId);
+
+        Assert.NotNull(stored);
+        Assert.Equal(response.TransactionId, stored!.TransactionId);
+        Assert.Equal("ORD-STORE-1", stored.OrderId);
+        Assert.Equal("PENDING", stored.Status);
     }
 
     private sealed class CapturingLogger<T> : ILogger<T>

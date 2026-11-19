@@ -61,10 +61,12 @@ if (gatewaySettings.UseRedis)
     });
 
     builder.Services.AddSingleton<IIdempotencyStore, RedisIdempotencyStore>();
+    builder.Services.AddSingleton<IPaymentStore, RedisPaymentStore>();
 }
 else
 {
     builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
+    builder.Services.AddSingleton<IPaymentStore, InMemoryPaymentStore>();
 }
 
 // Register Domain & Application Services

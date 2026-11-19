@@ -247,7 +247,23 @@ PaymentGateway.Api/
 }
 ```
 
-### 4.2 Webhook Ingestion
+### 4.2 Payment Intent Lookup
+
+* **Endpoint**: `GET /api/v1/payments/{transactionId}`
+* **Headers**: `X-Api-Key` (required), `X-Correlation-Id` (optional)
+
+#### Response (`200 OK`)
+Returns the stored payment intent using the same schema as the creation response.
+
+#### Errors
+| Status | Code | Meaning |
+| :--- | :--- | :--- |
+| `404 Not Found` | `PAYMENT_NOT_FOUND` | Unknown or expired transaction id. |
+| `401 Unauthorized` | `UNAUTHORIZED` | Missing or invalid `X-Api-Key`. |
+
+Entries live in the same store as idempotency records (Redis or in-memory) and expire after `IdempotencyTtlMinutes`. Durable history arrives with the PostgreSQL audit store in v1.1.
+
+### 4.3 Webhook Ingestion
 
 * **Endpoint**: `POST /api/v1/webhooks/{provider}`
 * **Route Parameter**: `provider` (e.g., `midtrans`, `xendit`, `stripe`)

@@ -11,13 +11,15 @@ public interface IPaymentService
 public class PaymentService : IPaymentService
 {
     private readonly ILogger<PaymentService> _logger;
+    private readonly IPaymentStore _paymentStore;
 
-    public PaymentService(ILogger<PaymentService> logger)
+    public PaymentService(ILogger<PaymentService> logger, IPaymentStore paymentStore)
     {
         _logger = logger;
+        _paymentStore = paymentStore;
     }
 
-    public Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken = default)
+    public async Task<PaymentResponse> CreatePaymentAsync(CreatePaymentRequest request, CancellationToken cancellationToken = default)
     {
         if (request.Amount <= 0)
         {
@@ -49,7 +51,8 @@ public class PaymentService : IPaymentService
                 CreatedAt: DateTimeOffset.UtcNow
             );
 
-            return Task.FromResult(response);
+            await _paymentStore.SaveAsync(response, cancellationToken);
+            return response;
         }
     }
 }

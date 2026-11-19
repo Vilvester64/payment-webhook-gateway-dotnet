@@ -37,6 +37,29 @@ public static class GatewayEndpoints
         .WithName("CreatePayment")
         .WithSummary("Creates a new payment intent with idempotency guarantees.");
 
+        api.MapGet("/payments/{transactionId}", async (
+            string transactionId,
+            IPaymentStore paymentStore,
+            HttpContext httpContext,
+            CancellationToken ct) =>
+        {
+            var payment = await paymentStore.GetAsync(transactionId, ct);
+            if (payment is null)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Payment Not Found",
+                    detail: $"No payment intent exists for transaction '{transactionId}'.",
+                    extensions: ErrorExtensions(httpContext, "PAYMENT_NOT_FOUND"));
+            }
+
+            return Results.Ok(payment);
+        })
+        .AddEndpointFilter<ApiKeyFilter>()
+        .RequireRateLimiting("payments")
+        .WithName("GetPayment")
+        .WithSummary("Returns a previously created payment intent by transaction id.");
+
         api.MapPost("/webhooks/payment-callback", async (
             WebhookPayload payload,
             IDownstreamNotificationService downstreamService,
